@@ -1,0 +1,233 @@
+/* ── wrapper ── */
+.sequencer {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #0c0c0c;
+  border-radius: 12px;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ── camera silhouette ── */
+.silhouette-wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.silhouette-body {
+  width: 38%;
+  height: 90%;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 50% 50% 0 0 / 42% 42% 0 0;
+  position: relative;
+}
+
+.silhouette-head {
+  position: absolute;
+  width: 42%;
+  height: 28%;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 50%;
+  top: -18%;
+  left: 29%;
+}
+
+/* ── grid ── */
+.grid {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: grid;
+  grid-template-columns: repeat(16, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  perspective: 600px;
+  perspective-origin: 50% 10%;
+}
+
+/* row label — floats over the full row, centered, pointer-events off so clicks pass through */
+.row-label {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.55);
+  text-transform: lowercase;
+  font-style: italic;
+}
+
+.cell {
+  border: 0.5px solid rgba(255, 255, 255, 0.07);
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: border-color 0.1s;
+}
+
+.cell--playhead {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* ── cube wrapper — sits inside each active cell ── */
+.cube {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+
+.cube--burst {
+  animation: cube-burst 0.55s cubic-bezier(0.34, 1.2, 0.64, 1) forwards;
+  will-change: transform;
+}
+
+/* shared face styles */
+.cube__face {
+  position: absolute;
+  border: 0.5px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* front face — full cell size, pushed forward by depth */
+.cube__face--front {
+  inset: 0;
+  transform: translateZ(var(--d));
+  background: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cube__face--front.cube__face--burst {
+  animation: face-flash 0.55s cubic-bezier(0.34, 1.2, 0.64, 1) forwards;
+}
+
+/* back face — sits flush with the grid plane */
+.cube__face--back {
+  inset: 0;
+  transform: translateZ(0px);
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* top face */
+.cube__face--top {
+  left: 0;
+  right: 0;
+  height: var(--d);
+  top: 0;
+  transform-origin: top center;
+  transform: rotateX(90deg) translateZ(calc(var(--d) * -1));
+}
+
+/* bottom face */
+.cube__face--bottom {
+  left: 0;
+  right: 0;
+  height: var(--d);
+  bottom: 0;
+  transform-origin: bottom center;
+  transform: rotateX(-90deg) translateZ(calc(var(--d) * -1));
+}
+
+/* left face */
+.cube__face--left {
+  top: 0;
+  bottom: 0;
+  width: var(--d);
+  left: 0;
+  transform-origin: left center;
+  transform: rotateY(-90deg) translateZ(calc(var(--d) * -1));
+}
+
+/* right face */
+.cube__face--right {
+  top: 0;
+  bottom: 0;
+  width: var(--d);
+  right: 0;
+  transform-origin: right center;
+  transform: rotateY(90deg) translateZ(calc(var(--d) * -1));
+}
+
+/* dot on the front face — larger, matches reference */
+.cube__dot {
+  width: 48%;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.90);
+  pointer-events: none;
+}
+
+/* ── play bar — thin single line, full height ── */
+.play-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  pointer-events: none;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.3);
+}
+
+
+
+/* ── cursor ── */
+.cursor-ring {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 0.5px solid rgba(255, 255, 255, 0.22);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.cursor-dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+/* ── floating play button ── */
+.play-btn {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+  z-index: 10;
+}
+
+.play-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.4);
+}
