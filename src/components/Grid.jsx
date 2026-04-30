@@ -1,17 +1,17 @@
 import { useCallback } from "react";
 import { ROWS, STEPS } from "../constants";
 
-const CUBE_DEPTH = 40;
-
 /**
  * Props:
- *   grid          — { [rowName]: number[] }
- *   playhead      — current step index or null
- *   burstCounters — Map of "rowIdx-stepIdx" → number (increments each hit)
- *   gridRef       — ref attached to the grid div
- *   onToggle      — (rowName, stepIndex) => void
+ *   grid       — { [rowName]: number[] }
+ *   playhead   — current step index or null
+ *   gridRef    — ref attached to the grid div
+ *   onToggle   — (rowName, stepIndex) => void
+ *
+ * Note: cube rendering is handled by ThreeCanvas — this component
+ * only provides invisible click targets and floating row labels.
  */
-export default function Grid({ grid, playhead, burstCounters, gridRef, onToggle }) {
+export default function Grid({ grid, playhead, gridRef, onToggle }) {
   const handleClick = useCallback((row, step) => {
     onToggle(row, step);
   }, [onToggle]);
@@ -20,50 +20,35 @@ export default function Grid({ grid, playhead, burstCounters, gridRef, onToggle 
     <div ref={gridRef} className="grid">
       {ROWS.map((row, r) => (
         <>
-          {/* floating row label — spans all columns, centered, clicks pass through */}
+          {/* floating row label — absolutely positioned so it doesn't affect cell layout */}
           <div
             key={`lbl-${row}`}
             className="row-label"
-            style={{ gridRow: r + 1, gridColumn: `1 / ${STEPS + 2}` }}
+            style={{
+              position: "absolute",
+              top:    `${(r / ROWS.length) * 100}%`,
+              height: `${(1 / ROWS.length) * 100}%`,
+              left: 0, right: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              pointerEvents: "none",
+              zIndex: 2,
+            }}
           >
             {row}
           </div>
 
-          {Array.from({ length: STEPS }, (_, s) => {
-            const active      = grid[row][s] === 1;
-            const isHead      = playhead === s;
-            const cellKey     = `${r}-${s}`;
-            const burstCount  = burstCounters.get(cellKey) ?? 0;
-
-            return (
-              <div
-                key={`${row}-${s}`}
-                data-cell={cellKey}
-                className={["cell", isHead ? "cell--playhead" : ""].filter(Boolean).join(" ")}
-                style={{ gridRow: r + 1, gridColumn: s + 1 }}
-                onClick={() => handleClick(row, s)}
-              >
-                {active && (
-                  // burstCount as key forces a full remount on every hit,
-                  // so the animation always starts from 0
-                  <div
-                    key={burstCount}
-                    className={`cube${burstCount > 0 ? " cube--burst" : ""}`}
-                    style={{ "--d": `${CUBE_DEPTH}px` }}
-                  >
-                    <div className="cube__face cube__face--back" />
-                    <div className="cube__face cube__face--top" />
-                    <div className="cube__face cube__face--bottom" />
-                    <div className="cube__face cube__face--left" />
-                    <div className="cube__face cube__face--right" />
-                    <div className={`cube__face cube__face--front${burstCount > 0 ? " cube__face--burst" : ""}`}>
-                      <div className="cube__dot" />
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {/* invisible click cells */}
+          {Array.from({ length: STEPS }, (_, s) => (
+            <div
+              key={`${row}-${s}`}
+              data-cell={`${r}-${s}`}
+              className={["cell", playhead === s ? "cell--playhead" : ""].filter(Boolean).join(" ")}
+              style={{ gridRow: r + 1, gridColumn: s + 1 }}
+              onClick={() => handleClick(row, s)}
+            />
+          ))}
         </>
       ))}
     </div>

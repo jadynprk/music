@@ -3,24 +3,25 @@ import { useState, useRef, useCallback } from "react";
 import { DEFAULT_GRID } from "../constants";
 import { useSequencer } from "../hooks/useSequencer";
 import { useCursor }    from "../hooks/useCursor";
-import { useCamera } from "../hooks/useCamera";
 
-import Grid     from "./Grid";
-import PlayBar  from "./PlayBar";
-import Cursor   from "./Cursor";
-import CameraFeed from "./CameraFeed";
+import CameraFeed  from "./CameraFeed";
+import ThreeCanvas from "./ThreeCanvas";
+import Grid        from "./Grid";
+import PlayBar     from "./PlayBar";
+import Cursor      from "./Cursor";
 
 import "../styles/index.css";
 import "../styles/sequencer.css";
 
 export default function HandSyncSequencer() {
-  const [grid, setGrid] = useState(DEFAULT_GRID);
-  const gridRef = useRef(null);
+  const [grid, setGrid]   = useState(DEFAULT_GRID);
+  const gridRef           = useRef(null);
+  const containerRef      = useRef(null);
 
   const { playhead, playing, burstCounters, togglePlay } =
     useSequencer(grid, gridRef);
 
-  // const cursor = useCursor();
+  const cursor = useCursor();
 
   const toggleCell = useCallback((row, step) => {
     setGrid(prev => ({
@@ -30,24 +31,38 @@ export default function HandSyncSequencer() {
   }, []);
 
   return (
-    <div className="sequencer">
+    <div className="sequencer" ref={containerRef}>
 
-      {/* camera feed */}
+      {/* layer 1 — live webcam */}
       <CameraFeed />
 
+      <div style={{
+        position: "absolute",
+        inset: 0,
+        background: "rgba(0, 0, 0, 0.35)",
+        pointerEvents: "none",
+      }} />
+
+      {/* layer 2 — Three.js cube rendering */}
+      <ThreeCanvas
+        grid={grid}
+        burstCounters={burstCounters}
+        containerRef={containerRef}
+        gridRef={gridRef}
+      />
+
+      {/* layer 3 — invisible click grid + row labels */}
       <Grid
         grid={grid}
         playhead={playhead}
-        burstCounters={burstCounters}
         gridRef={gridRef}
         onToggle={toggleCell}
       />
 
+      {/* layer 4 — play bar + cursor + controls */}
       <PlayBar playing={playing} />
-
       {/* <Cursor x={cursor.x} y={cursor.y} /> */}
 
-      {/* minimal floating play button — bottom left */}
       <button className="play-btn" onClick={togglePlay}>
         {playing ? "■" : "▶"}
       </button>
