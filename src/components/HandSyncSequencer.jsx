@@ -3,10 +3,12 @@ import { useState, useRef, useCallback } from "react";
 import { DEFAULT_GRID } from "../constants";
 import { useSequencer } from "../hooks/useSequencer";
 import { useCursor }    from "../hooks/useCursor";
+import { useCamera } from "../hooks/useCamera";
 
 import Grid     from "./Grid";
 import PlayBar  from "./PlayBar";
 import Cursor   from "./Cursor";
+import CameraFeed from "./CameraFeed";
 
 import "../styles/index.css";
 import "../styles/sequencer.css";
@@ -18,7 +20,7 @@ export default function HandSyncSequencer() {
   const { playhead, playing, burstCounters, togglePlay } =
     useSequencer(grid, gridRef);
 
-  const cursor = useCursor();
+  // const cursor = useCursor();
 
   const toggleCell = useCallback((row, step) => {
     setGrid(prev => ({
@@ -30,12 +32,8 @@ export default function HandSyncSequencer() {
   return (
     <div className="sequencer">
 
-      {/* camera stand-in — replace with <video> for live feed */}
-      <div className="silhouette-wrap">
-        <div className="silhouette-body">
-          <div className="silhouette-head" />
-        </div>
-      </div>
+      {/* camera feed */}
+      <CameraFeed />
 
       <Grid
         grid={grid}
@@ -47,7 +45,7 @@ export default function HandSyncSequencer() {
 
       <PlayBar playing={playing} />
 
-      <Cursor x={cursor.x} y={cursor.y} />
+      {/* <Cursor x={cursor.x} y={cursor.y} /> */}
 
       {/* minimal floating play button — bottom left */}
       <button className="play-btn" onClick={togglePlay}>
