@@ -1,24 +1,30 @@
-import { STEPS, STEP_MS } from "../constants";
+import { useEffect, useRef } from "react";
+import * as Tone from "tone";
 
-// total duration of one full loop in ms
-const LOOP_MS = STEPS * STEP_MS;
-
-/**
- * Props:
- *   playing — boolean
- *
- * Sweeps continuously across the screen using a CSS animation
- * synced to the sequencer loop duration. No per-step React updates.
- */
 export default function PlayBar({ playing }) {
+  const barRef = useRef(null);
+  const rafRef = useRef(null);
+
+  useEffect(() => {
+    if (!playing) {
+      cancelAnimationFrame(rafRef.current);
+      if (barRef.current) barRef.current.style.left = "0%";
+      return;
+    }
+
+    const update = () => {
+      if (barRef.current) {
+        const progress = Tone.getTransport().progress;
+        barRef.current.style.left = `${progress * 100}%`;
+      }
+      rafRef.current = requestAnimationFrame(update);
+    };
+
+    rafRef.current = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [playing]);
+
   if (!playing) return null;
 
-  return (
-    <div
-      className="play-bar"
-      style={{
-        animation: `bar-sweep ${LOOP_MS}ms linear infinite`,
-      }}
-    />
-  );
+  return <div ref={barRef} className="play-bar" />;
 }

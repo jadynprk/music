@@ -116,8 +116,8 @@ export default function ThreeCanvas({ grid, burstCounters, containerRef, gridRef
           // back face
           ctx.beginPath();
           ctx.rect(px + ox, py + oy, pw, ph);
-          ctx.fillStyle   = "rgba(255,255,255,0.15)";
-          ctx.strokeStyle = `rgba(255,255,255,${0.15 + progress * 0.2})`;
+          ctx.fillStyle   = "rgba(255,255,255,0.03)";
+          ctx.strokeStyle = `rgba(255,255,255,${0.10 + progress * 0.2})`;
           ctx.lineWidth   = 0.8;
           ctx.fill();
           ctx.stroke();
@@ -129,7 +129,7 @@ export default function ThreeCanvas({ grid, burstCounters, containerRef, gridRef
           ctx.lineTo(px + ox + pw, py + oy);
           ctx.lineTo(px + pw,      py);
           ctx.closePath();
-          ctx.fillStyle   = `rgba(255,255,255,${0.15 + progress * 0.2})`;
+          ctx.fillStyle   = `rgba(255,255,255,${0.05 + progress * 0.08})`;
           ctx.strokeStyle = `rgba(255,255,255,${0.12 + progress * 0.22})`;
           ctx.fill();
           ctx.stroke();
@@ -141,7 +141,7 @@ export default function ThreeCanvas({ grid, burstCounters, containerRef, gridRef
           ctx.lineTo(px + ox, py + oy + ph);
           ctx.lineTo(px,      py + ph);
           ctx.closePath();
-          ctx.fillStyle   = `rgba(255,255,255,${0.15 + progress * 0.2})`;
+          ctx.fillStyle   = `rgba(255,255,255,${0.04 + progress * 0.06})`;
           ctx.strokeStyle = `rgba(255,255,255,${0.12 + progress * 0.22})`;
           ctx.fill();
           ctx.stroke();
@@ -149,7 +149,7 @@ export default function ThreeCanvas({ grid, burstCounters, containerRef, gridRef
           // front face
           ctx.beginPath();
           ctx.rect(px, py, pw, ph);
-          ctx.fillStyle   = `rgba(255,255,255,${0.15 + progress * 0.2})`;
+          ctx.fillStyle   = `rgba(255,255,255,${0.12 + progress * 0.15})`;
           ctx.strokeStyle = `rgba(255,255,255,${0.25 + progress * 0.45})`;
           ctx.lineWidth   = progress > 0.1 ? 1.2 : 0.8;
           ctx.fill();

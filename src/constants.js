@@ -1,7 +1,6 @@
-export const ROWS = ["kick", "snare", "clap", "hi-hat"];
+export const ROWS  = ["kick", "snare", "clap", "hi-hat"];
 export const STEPS = 16;
-export const BPM = 70;
-export const STEP_MS = (60 / BPM / 4) * 1000;
+export const BPM   = 120; // Tone.Transport uses this directly
 
 export const DEFAULT_GRID = {
   kick:     [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],

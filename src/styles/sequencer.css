@@ -9,6 +9,8 @@
   user-select: none;
 }
 
+
+
 /* ── grid — invisible click layer over the Three.js canvas ── */
 .grid {
   position: absolute;
@@ -37,7 +39,7 @@
 }
 
 .cell {
-  border: 0.5px solid rgba(255, 255, 255, 0.15);
+  border: 0.5px solid rgba(255, 255, 255, 0.07);
   background: transparent;
   cursor: pointer;
   position: relative;
@@ -46,7 +48,7 @@
 }
 
 .cell--playhead {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.03);
   border-color: rgba(255, 255, 255, 0.12);
 }
 
@@ -58,10 +60,12 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 12px;
+  width: 10px;
   background: rgba(255, 255, 255, 0.7);
   pointer-events: none;
-  box-shadow: 0 0 6px rgba(255, 255, 255, 0.3);
+  /*box-shadow: 0 0 6px rgba(255, 255, 255, 0.3);*/
+  box-shadow: 0 0 8px 2px rgba(255, 255, 255, 0.4),
+              0 0 20px 4px rgba(255, 255, 255, 0.15);
 }
 
 

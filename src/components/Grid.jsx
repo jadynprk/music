@@ -11,7 +11,7 @@ import { ROWS, STEPS } from "../constants";
  * Note: cube rendering is handled by ThreeCanvas — this component
  * only provides invisible click targets and floating row labels.
  */
-export default function Grid({ grid, playhead, gridRef, onToggle }) {
+export default function Grid({ grid, gridRef, onToggle }) {
   const handleClick = useCallback((row, step) => {
     onToggle(row, step);
   }, [onToggle]);
@@ -20,7 +20,7 @@ export default function Grid({ grid, playhead, gridRef, onToggle }) {
     <div ref={gridRef} className="grid">
       {ROWS.map((row, r) => (
         <>
-          {/* floating row label — absolutely positioned so it doesn't affect cell layout */}
+          {/* floating row label — absolutely positioned */}
           <div
             key={`lbl-${row}`}
             className="row-label"
@@ -44,7 +44,7 @@ export default function Grid({ grid, playhead, gridRef, onToggle }) {
             <div
               key={`${row}-${s}`}
               data-cell={`${r}-${s}`}
-              className={["cell", playhead === s ? "cell--playhead" : ""].filter(Boolean).join(" ")}
+              className="cell"
               style={{ gridRow: r + 1, gridColumn: s + 1 }}
               onClick={() => handleClick(row, s)}
             />
