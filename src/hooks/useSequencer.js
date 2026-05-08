@@ -78,12 +78,11 @@ export function useSequencer(grid, triggerRow) {
   }, []);
 
   const togglePlay = useCallback(async () => {
-    // Tone.start() must be called from a user gesture — unlocks AudioContext
     await Tone.start();
 
     if (Tone.getTransport().state === "started") {
+      sequenceRef.current?.stop(Math.max(0, Tone.now()));  // clamp to 0
       Tone.getTransport().stop();
-      sequenceRef.current?.stop();
       stepRef.current = 0;
       setPlaying(false);
     } else {
