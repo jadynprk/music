@@ -1,0 +1,19 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #0c0c0c;
+  font-family: 'Space Mono', monospace;
+}
+
+/* play bar sweeps continuously across all 16 steps 
+@keyframes bar-sweep {
+  from { left: 0%; }
+  to   { left: 100%; }
+}
+*/

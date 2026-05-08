@@ -1,0 +1,117 @@
+/* ── wrapper ── */
+.sequencer {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #0c0c0c;
+  border-radius: 12px;
+  overflow: hidden;
+  user-select: none;
+}
+
+
+
+/* ── grid — invisible click layer over the Three.js canvas ── */
+.grid {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: grid;
+  grid-template-columns: repeat(16, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+}
+
+/* row label — floats over the full row, centered, pointer-events off so clicks pass through */
+.row-label {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.55);
+  text-transform: lowercase;
+  font-style: italic;
+}
+
+.cell {
+  border: 0.5px solid rgba(255, 255, 255, 0.07);
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: border-color 0.1s;
+}
+
+.cell--playhead {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+
+
+
+/* ── play bar — thin single line, full height ── */
+.play-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  background: rgba(255, 255, 255, 0.7);
+  pointer-events: none;
+  /*box-shadow: 0 0 6px rgba(255, 255, 255, 0.3);*/
+  box-shadow: 0 0 8px 2px rgba(255, 255, 255, 0.4),
+              0 0 20px 4px rgba(255, 255, 255, 0.15);
+}
+
+
+
+/* ── cursor ── */
+.cursor-ring {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 0.5px solid rgba(255, 255, 255, 0.22);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.cursor-dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+/* ── floating play button ── */
+.play-btn {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+  z-index: 10;
+}
+
+.play-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.4);
+}

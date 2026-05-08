@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Hand Tracker</title>
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      color: white;
+      font-family: monospace;
+    }
+    #container { position: relative; }
+    canvas { display: block; transform: scaleX(-1); }
+    #status { margin-top: 12px; font-size: 14px; color: #aaa; }
+    #gesture-display {
+      margin-top: 10px;
+      font-size: 28px;
+      min-height: 40px;
+      color: #ffff00;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <canvas id="canvas"></canvas>
+  </div>
+  <div id="status">Loading model...</div>
+  <div id="gesture-display"></div>
+
+  <script type="module">
+    import {
+      HandLandmarker,
+      FilesetResolver,
+      DrawingUtils
+    } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.mjs";
+
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const statusEl = document.getElementById("status");
+    const gestureDisplay = document.getElementById("gesture-display");
+
+    const HANDEDNESS_TEXT_COLOR = "magenta";
+    const LANDMARK_COLOR        = "lime";
+    const CONNECTION_COLOR      = "white";
+    const FINGERTIP_COLOR       = "blue";
+    const GESTURE_TEXT_COLOR    = "cyan";
+
+    // --- Finger state helpers ---
+    function fingerIsUp(landmarks, tipIdx, pipIdx) {
+      return landmarks[tipIdx].y < landmarks[pipIdx].y;
+    }
+
+    function thumbIsUp(landmarks) {
+      // Thumb points sideways, so compare x instead of y
+      // (after mirror flip, left thumb up = tip.x > mcp.x)
+      return landmarks[4].x > landmarks[3].x;
+    }
+
+    function isOpenPalm(landmarks) {
+      return (
+        fingerIsUp(landmarks, 8, 6)  &&
+        fingerIsUp(landmarks, 12, 10) &&
+        fingerIsUp(landmarks, 16, 14) &&
+        fingerIsUp(landmarks, 20, 18)
+      );
+    }
+
+    // Single hand gestures (left hand only)
+    function detectGesture(landmarks) {
+      const indexUp  = fingerIsUp(landmarks, 8, 6);
+      const middleUp = fingerIsUp(landmarks, 12, 10);
+      const ringUp   = fingerIsUp(landmarks, 16, 14);
+      const pinkyUp  = fingerIsUp(landmarks, 20, 18);
+
+      if (indexUp && middleUp && !ringUp && !pinkyUp) return "peace";
+      if (thumbIsUp(landmarks) && !indexUp && !middleUp && !ringUp && !pinkyUp) return "thumbs up";
+      return null;
+    }
+
+    // Two-hand gesture (requires both hands present)
+    function detectTwoHandGesture(leftLandmarks, rightLandmarks) {
+      if (isOpenPalm(leftLandmarks) && isOpenPalm(rightLandmarks)) return "hands up";
+      return null;
+    }
+
+    // --- Load model ---
+    const vision = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+    );
+
+    const handLandmarker = await HandLandmarker.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+        delegate: "GPU"
+      },
+      numHands: 2,
+      runningMode: "VIDEO"
+    });
+
+    statusEl.textContent = "Model loaded. Starting camera...";
+
+    // --- Camera setup ---
+    const video = document.createElement("video");
+    video.autoplay = true;
+    video.playsInline = true;
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    video.srcObject = stream;
+    await new Promise(resolve => video.onloadedmetadata = resolve);
+    video.play();
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    statusEl.textContent = "Press Q to quit";
+
+    const drawingUtils = new DrawingUtils(ctx);
+    const HAND_CONNECTIONS = HandLandmarker.HAND_CONNECTIONS;
+
+    function drawLandmarksOnImage(landmarks, handedness) {
+      const width = canvas.width;
+      const height = canvas.height;
+
+      let rightFingertip = null;
+      let leftLandmarks = null;
+      let rightLandmarks = null;
+      const perHandGestures = {};
+
+      // First pass: identify which hand is which
+      landmarks.forEach((handLandmarks, idx) => {
+        const label = handedness[idx][0].categoryName;
+        if (label === "Left")  leftLandmarks  = handLandmarks;
+        if (label === "Right") rightLandmarks = handLandmarks;
+      });
+
+      // Check two-hand gesture first so it takes priority
+      const twoHandGesture = (leftLandmarks && rightLandmarks)
+        ? detectTwoHandGesture(leftLandmarks, rightLandmarks)
+        : null;
+
+      // Second pass: draw
+      landmarks.forEach((handLandmarks, idx) => {
+        const label = handedness[idx][0].categoryName;
+
+        const points = handLandmarks.map(lm => ({
+          x: lm.x * width,
+          y: lm.y * height
+        }));
+
+        drawingUtils.drawConnectors(handLandmarks, HAND_CONNECTIONS,
+          { color: CONNECTION_COLOR, lineWidth: 2 });
+        drawingUtils.drawLandmarks(handLandmarks,
+          { color: LANDMARK_COLOR, lineWidth: 1, radius: 3 });
+
+        // Right hand: fingertip only
+        if (label === "Right") {
+          const tip = points[8];
+          rightFingertip = { x: Math.round(tip.x), y: Math.round(tip.y) };
+
+          ctx.beginPath();
+          ctx.arc(tip.x, tip.y, 5, 0, 2 * Math.PI);
+          ctx.fillStyle = FINGERTIP_COLOR;
+          ctx.fill();
+
+          ctx.save();
+          ctx.scale(-1, 1);
+          ctx.fillStyle = FINGERTIP_COLOR;
+          ctx.font = "14px monospace";
+          ctx.fillText(`(${rightFingertip.x}, ${rightFingertip.y})`, -(tip.x - 15), tip.y);
+          ctx.restore();
+        }
+
+        // Left hand: single-hand gesture label (suppressed if two-hand gesture active)
+        if (label === "Left" && !twoHandGesture) {
+          const gesture = detectGesture(handLandmarks);
+          const gestureText = gesture ?? "no gesture";
+
+          ctx.save();
+          ctx.scale(-1, 1);
+          ctx.fillStyle = GESTURE_TEXT_COLOR;
+          ctx.font = "bold 18px monospace";
+          ctx.fillText(gestureText, -(points[0].x + 20), points[0].y - 30);
+          ctx.restore();
+        }
+
+        // Hand label
+        ctx.save();
+        ctx.scale(-1, 1);
+        ctx.fillStyle = HANDEDNESS_TEXT_COLOR;
+        ctx.font = "18px monospace";
+        ctx.fillText(label, -(points[0].x), points[0].y - 10);
+        ctx.restore();
+      });
+
+      return { rightFingertip, twoHandGesture };
+    }
+
+    // --- Q to quit ---
+    document.addEventListener("keydown", e => {
+      if (e.key === "q" || e.key === "Q") {
+        stream.getTracks().forEach(t => t.stop());
+        statusEl.textContent = "Stopped.";
+      }
+    });
+
+    // --- Main loop ---
+    function detect() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(video, 0, 0);
+
+      const result = handLandmarker.detectForVideo(video, performance.now());
+
+      let rightFingertip = null;
+      let twoHandGesture = null;
+
+      if (result.landmarks?.length > 0) {
+        ({ rightFingertip, twoHandGesture } = drawLandmarksOnImage(result.landmarks, result.handedness));
+      }
+
+      // Two-hand gesture gets shown in the display div below the canvas
+      gestureDisplay.textContent = twoHandGesture ? `${twoHandGesture}` : "";
+
+      if (rightFingertip) {
+        statusEl.textContent = `Right index tip: (${rightFingertip.x}, ${rightFingertip.y})`;
+      } else {
+        statusEl.textContent = "Press Q to quit";
+      }
+
+      requestAnimationFrame(detect);
+    }
+
+    detect();
+  </script>
+</body>
+</html>
