@@ -25,7 +25,7 @@ function detectSingleHandGesture(landmarks) {
   const pinkyUp  = fingerIsUp(landmarks, 20, 18);
 
   if (indexUp && middleUp && !ringUp && !pinkyUp) return "peace";
-  if (thumbIsUp(landmarks) && !indexUp && !middleUp && !ringUp && !pinkyUp) return "thumbs_up";
+  // if (thumbIsUp(landmarks) && !indexUp && !middleUp && !ringUp && !pinkyUp) return "thumbs_up";
   return null;
 }
 
