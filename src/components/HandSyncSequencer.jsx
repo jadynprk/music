@@ -1,9 +1,10 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
-import { DEFAULT_GRID } from "../constants";
-import { useSequencer } from "../hooks/useSequencer";
-import { useCursor }    from "../hooks/useCursor";
-import { useAudio }     from "../hooks/useAudio";
+import { DEFAULT_GRID, ROWS, STEPS } from "../constants";
+import { useSequencer }    from "../hooks/useSequencer";
+import { useAudio }        from "../hooks/useAudio";
+import { useCamera }       from "../hooks/useCamera";
+import { useHandTracking } from "../hooks/useHandTracking";
 
 import CameraFeed  from "./CameraFeed";
 import ThreeCanvas from "./ThreeCanvas";
@@ -15,17 +16,64 @@ import "../styles/index.css";
 import "../styles/sequencer.css";
 import * as Tone from "tone";
 
+// how many ms must pass before the same gesture can fire again
+const GESTURE_COOLDOWN_MS = 600;
+
 export default function HandSyncSequencer() {
-  const [grid, setGrid] = useState(DEFAULT_GRID);
-  const gridRef         = useRef(null);
-  const containerRef    = useRef(null);
+  const [grid, setGrid]       = useState(DEFAULT_GRID);
+  const [cursor, setCursor]   = useState({ x: 0.5, y: 0.5 });
+  const [gesture, setGesture] = useState(null);
+
+  const gridRef        = useRef(null);
+  const containerRef   = useRef(null);
+  const cursorRef      = useRef({ x: 0.5, y: 0.5 });  // always-fresh cursor for gesture handler
+  const lastGestureRef = useRef(0);                     // timestamp of last fired gesture
 
   const { startContext, triggerRow } = useAudio();
+  const { playing, burstCounters, togglePlay } = useSequencer(grid, triggerRow);
+  const videoRef = useCamera();
 
-  const { playing, burstCounters, togglePlay } =
-    useSequencer(grid, triggerRow);
+  const handleHandResult = useCallback(({ rightFingertip, gesture: g }) => {
+    if (rightFingertip) {
+      const pos = { x: 1 - rightFingertip.x, y: rightFingertip.y };
+      setCursor(pos);
+      cursorRef.current = pos;
+    }
+    setGesture(g);
 
-  const cursor = useCursor();
+    // --- thumbs up: place/remove note at cursor position ---
+    if (g === "peace") {
+      const now = Date.now();
+      if (now - lastGestureRef.current < GESTURE_COOLDOWN_MS) return;
+      lastGestureRef.current = now;
+
+      const { x, y } = cursorRef.current;
+
+      // map 0-1 cursor fractions to grid row + step
+      const step = Math.floor(x * STEPS);
+      const rowIdx = Math.floor(y * ROWS.length);
+
+      // clamp to valid range
+      if (step < 0 || step >= STEPS || rowIdx < 0 || rowIdx >= ROWS.length) return;
+
+      const row = ROWS[rowIdx];
+      setGrid(prev => ({
+        ...prev,
+        [row]: prev[row].map((v, i) => (i === step ? (v ? 0 : 1) : v)),
+      }));
+    }
+
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useHandTracking(videoRef, handleHandResult);
+
+  // stop gesture → play/pause
+  useEffect(() => {
+    if (gesture !== "stop") return;
+    Tone.start().then(() => {
+      startContext().then(() => togglePlay());
+    });
+  }, [gesture]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleCell = useCallback((row, step) => {
     setGrid(prev => ({
@@ -35,7 +83,6 @@ export default function HandSyncSequencer() {
   }, []);
 
   const handlePlay = useCallback(async () => {
-    // startContext loads samples and unlocks AudioContext on first press
     await Tone.start();
     await startContext();
     togglePlay();
@@ -44,10 +91,8 @@ export default function HandSyncSequencer() {
   return (
     <div className="sequencer" ref={containerRef}>
 
-      {/* layer 1 — live webcam */}
-      <CameraFeed />
+      <CameraFeed ref={videoRef} />
 
-      {/* layer 1.5 — dim overlay for contrast */}
       <div style={{
         position: "absolute",
         inset: 0,
@@ -55,7 +100,6 @@ export default function HandSyncSequencer() {
         pointerEvents: "none",
       }} />
 
-      {/* layer 2 — 2D canvas cube rendering */}
       <ThreeCanvas
         grid={grid}
         burstCounters={burstCounters}
@@ -63,16 +107,26 @@ export default function HandSyncSequencer() {
         gridRef={gridRef}
       />
 
-      {/* layer 3 — invisible click grid + row labels */}
-      <Grid
-        grid={grid}
-        gridRef={gridRef}
-        onToggle={toggleCell}
-      />
+      <Grid grid={grid} gridRef={gridRef} onToggle={toggleCell} />
 
-      {/* layer 4 — play bar + cursor + controls */}
       <PlayBar playing={playing} />
-      {/* <Cursor x={cursor.x} y={cursor.y} /> */}
+      <Cursor x={cursor.x} y={cursor.y} />
+
+      {gesture && (
+        <div style={{
+          position: "absolute",
+          bottom: 56,
+          left: "50%",
+          transform: "translateX(-50%)",
+          color: "cyan",
+          fontFamily: "monospace",
+          fontSize: 18,
+          pointerEvents: "none",
+          opacity: 0.85,
+        }}>
+          {gesture}
+        </div>
+      )}
 
       <button className="play-btn" onClick={handlePlay}>
         {playing ? "■" : "▶"}
