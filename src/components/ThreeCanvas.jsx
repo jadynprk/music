@@ -2,19 +2,28 @@ import { useEffect, useRef } from "react";
 import { STEPS } from "../constants";
 
 const BURST_FRAMES = 25;
-const PAD = 1.0;
 
 export default function ThreeCanvas({ grid, rows, burstCounters, containerRef, gridRef }) {
-  const canvasRef  = useRef(null);
-  const rafRef     = useRef(null);
-  const burstRef   = useRef({});
-  const gridRef2   = useRef(grid);
-  const rowsRef    = useRef(rows);
-  const prevBurst  = useRef(new Map());
-  const cellRects  = useRef({});
+  const canvasRef      = useRef(null);
+  const rafRef         = useRef(null);
+  const burstRef       = useRef({});
+  const gridRef2       = useRef(grid);
+  const rowsRef        = useRef(rows);
+  const prevBurst      = useRef(new Map());
+  const cellRects      = useRef({});
+  const cacheFnRef     = useRef(null); // exposed so rows-change effect can call it
 
   useEffect(() => { gridRef2.current = grid; }, [grid]);
-  useEffect(() => { rowsRef.current  = rows; }, [rows]);
+
+  // when rows change (mode switch), clear stale rects and recache
+  useEffect(() => {
+    rowsRef.current = rows;
+    cellRects.current = {};
+    burstRef.current  = {};
+    // wait one frame for the new DOM cells to render before measuring
+    const t = setTimeout(() => cacheFnRef.current?.(), 60);
+    return () => clearTimeout(t);
+  }, [rows]);
 
   useEffect(() => {
     burstCounters.forEach((count, key) => {
@@ -34,19 +43,21 @@ export default function ThreeCanvas({ grid, rows, burstCounters, containerRef, g
 
     const dpr = window.devicePixelRatio;
 
-    const resize = () => {
-      canvas.width  = container.clientWidth  * dpr;
-      canvas.height = container.clientHeight * dpr;
+    const setCanvasSize = () => {
+      canvas.width        = container.clientWidth  * dpr;
+      canvas.height       = container.clientHeight * dpr;
       canvas.style.width  = container.clientWidth  + "px";
       canvas.style.height = container.clientHeight + "px";
-      cacheCellRects();
     };
 
     const cacheCellRects = () => {
-      const gridEl     = gridRef.current;
+      const gridEl      = gridRef.current;
       const currentRows = rowsRef.current;
       if (!gridEl) return;
       const canvasRect = canvas.getBoundingClientRect();
+
+      // clear old rects first
+      cellRects.current = {};
 
       currentRows.forEach((_, r) => {
         for (let s = 0; s < STEPS; s++) {
@@ -64,10 +75,14 @@ export default function ThreeCanvas({ grid, rows, burstCounters, containerRef, g
       });
     };
 
+    // expose so the rows-change effect can call it
+    cacheFnRef.current = cacheCellRects;
+
     const tryCache = () => {
       const gridEl = gridRef.current;
       if (gridEl && gridEl.querySelector("[data-cell]")) {
-        resize();
+        setCanvasSize();
+        cacheCellRects();
       } else {
         setTimeout(tryCache, 50);
       }
@@ -75,7 +90,7 @@ export default function ThreeCanvas({ grid, rows, burstCounters, containerRef, g
     tryCache();
 
     const ro = new ResizeObserver(() => {
-      resize();
+      setCanvasSize();
       cacheCellRects();
     });
     ro.observe(container);
@@ -83,12 +98,10 @@ export default function ThreeCanvas({ grid, rows, burstCounters, containerRef, g
     const draw = () => {
       rafRef.current = requestAnimationFrame(draw);
       const ctx         = canvas.getContext("2d");
-      const W           = canvas.width;
-      const H           = canvas.height;
       const currentGrid = gridRef2.current;
       const currentRows = rowsRef.current;
 
-      ctx.clearRect(0, 0, W, H);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       currentRows.forEach((row, r) => {
         for (let s = 0; s < STEPS; s++) {
@@ -98,71 +111,51 @@ export default function ThreeCanvas({ grid, rows, burstCounters, containerRef, g
           const rect = cellRects.current[key];
           if (!rect) continue;
 
+          // draw exactly at the cell rect — no padding, no offset
           const { x, y, w, h } = rect;
 
           const bf       = burstRef.current[key] ?? 0;
           const progress = bf > 0 ? Math.sin((1 - bf / BURST_FRAMES) * Math.PI) : 0;
           if (bf > 0) burstRef.current[key] = bf - 1;
 
-          const depth  = Math.min(w, h) * 0.18;
-          const lift   = progress * depth * 4;
-          const offset = depth + lift;
+          // burst: scale up slightly from center
+          const scale  = 1 + progress * 0.12;
+          const cx     = x + w / 2;
+          const cy     = y + h / 2;
+          const pw     = w * scale;
+          const ph     = h * scale;
+          const px     = cx - pw / 2;
+          const py     = cy - ph / 2;
 
-          const px = x + (w - w * PAD) / 2;
-          const py = y + (h - h * PAD) / 2;
-          const pw = w * PAD;
-          const ph = h * PAD;
+          // subtle depth offset only during burst
+          const ox = -progress * w * 0.08;
+          const oy = -progress * h * 0.08;
 
-          const ox = -offset * 0.6;
-          const oy = -offset * 0.5;
+          // back face (only visible during burst)
+          if (progress > 0.05) {
+            ctx.beginPath();
+            ctx.rect(px + ox, py + oy, pw, ph);
+            ctx.fillStyle   = "rgba(255,255,255,0.02)";
+            ctx.strokeStyle = `rgba(255,255,255,${progress * 0.25})`;
+            ctx.lineWidth   = 0.8;
+            ctx.fill();
+            ctx.stroke();
+          }
 
-          // back face
-          ctx.beginPath();
-          ctx.rect(px + ox, py + oy, pw, ph);
-          ctx.fillStyle   = "rgba(255,255,255,0.03)";
-          ctx.strokeStyle = `rgba(255,255,255,${0.10 + progress * 0.2})`;
-          ctx.lineWidth   = 0.8;
-          ctx.fill();
-          ctx.stroke();
-
-          // top face
-          ctx.beginPath();
-          ctx.moveTo(px,           py);
-          ctx.lineTo(px + ox,      py + oy);
-          ctx.lineTo(px + ox + pw, py + oy);
-          ctx.lineTo(px + pw,      py);
-          ctx.closePath();
-          ctx.fillStyle   = `rgba(255,255,255,${0.05 + progress * 0.08})`;
-          ctx.strokeStyle = `rgba(255,255,255,${0.12 + progress * 0.22})`;
-          ctx.fill();
-          ctx.stroke();
-
-          // left face
-          ctx.beginPath();
-          ctx.moveTo(px,      py);
-          ctx.lineTo(px + ox, py + oy);
-          ctx.lineTo(px + ox, py + oy + ph);
-          ctx.lineTo(px,      py + ph);
-          ctx.closePath();
-          ctx.fillStyle   = `rgba(255,255,255,${0.04 + progress * 0.06})`;
-          ctx.strokeStyle = `rgba(255,255,255,${0.12 + progress * 0.22})`;
-          ctx.fill();
-          ctx.stroke();
-
-          // front face
+          // front face — always drawn at exact cell position at rest
           ctx.beginPath();
           ctx.rect(px, py, pw, ph);
-          ctx.fillStyle   = `rgba(255,255,255,${0.07 + progress * 0.15})`;
-          ctx.strokeStyle = `rgba(255,255,255,${0.25 + progress * 0.45})`;
-          ctx.lineWidth   = progress > 0.1 ? 1.2 : 0.8;
+          ctx.fillStyle   = `rgba(255,255,255,${0.07 + progress * 0.18})`;
+          ctx.strokeStyle = `rgba(255,255,255,${0.28 + progress * 0.45})`;
+          ctx.lineWidth   = 0.8 + progress * 0.6;
           ctx.fill();
           ctx.stroke();
 
-          // dot
-          const dotR = Math.min(pw, ph) * 0.22;
+          // dot — centered, doesn't scale with burst
+          const dotR = Math.min(w, h) * 0.22;
           ctx.beginPath();
-          ctx.arc(px + pw / 2, py + ph / 2, dotR, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(255,255,255,${0.82 + progress * 0.18})`;
+          ctx.arc(x + w / 2, y + h / 2, dotR, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255,255,255,${0.85 + progress * 0.15})`;
           ctx.fill();
         }
       });
@@ -184,4 +177,3 @@ export default function ThreeCanvas({ grid, rows, burstCounters, containerRef, g
     />
   );
 }
-
