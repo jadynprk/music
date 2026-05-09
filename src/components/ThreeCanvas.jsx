@@ -1,24 +1,26 @@
 import { useEffect, useRef } from "react";
-import { ROWS, STEPS } from "../constants";
+import { STEPS } from "../constants";
 
 const BURST_FRAMES = 25;
-const PAD = 0.96;
+const PAD = 1.0;
 
-export default function ThreeCanvas({ grid, burstCounters, containerRef, gridRef }) {
+export default function ThreeCanvas({ grid, rows, burstCounters, containerRef, gridRef }) {
   const canvasRef  = useRef(null);
   const rafRef     = useRef(null);
   const burstRef   = useRef({});
   const gridRef2   = useRef(grid);
+  const rowsRef    = useRef(rows);
   const prevBurst  = useRef(new Map());
-  const cellRects  = useRef({}); // cached cell rects in canvas coords
+  const cellRects  = useRef({});
 
   useEffect(() => { gridRef2.current = grid; }, [grid]);
+  useEffect(() => { rowsRef.current  = rows; }, [rows]);
 
   useEffect(() => {
     burstCounters.forEach((count, key) => {
       const prev = prevBurst.current.get(key) ?? 0;
       const [r, s] = key.split("-").map(Number);
-      if (count !== prev && gridRef2.current[ROWS[r]]?.[s] === 1) {
+      if (count !== prev && gridRef2.current[rowsRef.current[r]]?.[s] === 1) {
         burstRef.current[key] = BURST_FRAMES;
       }
     });
@@ -40,19 +42,18 @@ export default function ThreeCanvas({ grid, burstCounters, containerRef, gridRef
       cacheCellRects();
     };
 
-    // cache rects by measuring each cell relative to the canvas element
     const cacheCellRects = () => {
-      const gridEl = gridRef.current;
+      const gridEl     = gridRef.current;
+      const currentRows = rowsRef.current;
       if (!gridEl) return;
       const canvasRect = canvas.getBoundingClientRect();
 
-      ROWS.forEach((_, r) => {
+      currentRows.forEach((_, r) => {
         for (let s = 0; s < STEPS; s++) {
           const key    = `${r}-${s}`;
           const cellEl = gridEl.querySelector(`[data-cell="${key}"]`);
           if (!cellEl) continue;
           const cr = cellEl.getBoundingClientRect();
-          // store in canvas pixel space (multiplied by dpr)
           cellRects.current[key] = {
             x: (cr.left - canvasRect.left) * dpr,
             y: (cr.top  - canvasRect.top)  * dpr,
@@ -63,7 +64,6 @@ export default function ThreeCanvas({ grid, burstCounters, containerRef, gridRef
       });
     };
 
-    // wait for cells to be in DOM before first cache
     const tryCache = () => {
       const gridEl = gridRef.current;
       if (gridEl && gridEl.querySelector("[data-cell]")) {
@@ -74,7 +74,10 @@ export default function ThreeCanvas({ grid, burstCounters, containerRef, gridRef
     };
     tryCache();
 
-    const ro = new ResizeObserver(resize);
+    const ro = new ResizeObserver(() => {
+      resize();
+      cacheCellRects();
+    });
     ro.observe(container);
 
     const draw = () => {
@@ -83,12 +86,13 @@ export default function ThreeCanvas({ grid, burstCounters, containerRef, gridRef
       const W           = canvas.width;
       const H           = canvas.height;
       const currentGrid = gridRef2.current;
+      const currentRows = rowsRef.current;
 
       ctx.clearRect(0, 0, W, H);
 
-      ROWS.forEach((row, r) => {
+      currentRows.forEach((row, r) => {
         for (let s = 0; s < STEPS; s++) {
-          if (currentGrid[row][s] !== 1) continue;
+          if (currentGrid[row]?.[s] !== 1) continue;
 
           const key  = `${r}-${s}`;
           const rect = cellRects.current[key];
@@ -109,7 +113,6 @@ export default function ThreeCanvas({ grid, burstCounters, containerRef, gridRef
           const pw = w * PAD;
           const ph = h * PAD;
 
-          // offset goes up-left so depth reads as going away from viewer
           const ox = -offset * 0.6;
           const oy = -offset * 0.5;
 
@@ -122,7 +125,7 @@ export default function ThreeCanvas({ grid, burstCounters, containerRef, gridRef
           ctx.fill();
           ctx.stroke();
 
-          // top connecting face
+          // top face
           ctx.beginPath();
           ctx.moveTo(px,           py);
           ctx.lineTo(px + ox,      py + oy);
@@ -134,7 +137,7 @@ export default function ThreeCanvas({ grid, burstCounters, containerRef, gridRef
           ctx.fill();
           ctx.stroke();
 
-          // left connecting face
+          // left face
           ctx.beginPath();
           ctx.moveTo(px,      py);
           ctx.lineTo(px + ox, py + oy);
@@ -149,7 +152,7 @@ export default function ThreeCanvas({ grid, burstCounters, containerRef, gridRef
           // front face
           ctx.beginPath();
           ctx.rect(px, py, pw, ph);
-          ctx.fillStyle   = `rgba(255,255,255,${0.12 + progress * 0.15})`;
+          ctx.fillStyle   = `rgba(255,255,255,${0.07 + progress * 0.15})`;
           ctx.strokeStyle = `rgba(255,255,255,${0.25 + progress * 0.45})`;
           ctx.lineWidth   = progress > 0.1 ? 1.2 : 0.8;
           ctx.fill();
@@ -181,3 +184,4 @@ export default function ThreeCanvas({ grid, burstCounters, containerRef, gridRef
     />
   );
 }
+

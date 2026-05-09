@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import * as Tone from "tone";
 
-import { DEFAULT_GRID, ROWS, STEPS } from "../constants";
+import { DEFAULT_GRID, DEFAULT_SYNTH_GRID, ROWS, SYNTH_NOTES, STEPS } from "../constants";
 import { useSequencer }    from "../hooks/useSequencer";
 import { useAudio }        from "../hooks/useAudio";
 import { useCamera }       from "../hooks/useCamera";
@@ -14,24 +15,46 @@ import Cursor      from "./Cursor";
 
 import "../styles/index.css";
 import "../styles/sequencer.css";
-import * as Tone from "tone";
 
-// how many ms must pass before the same gesture can fire again
 const GESTURE_COOLDOWN_MS = 600;
 
 export default function HandSyncSequencer() {
-  const [grid, setGrid]       = useState(DEFAULT_GRID);
-  const [cursor, setCursor]   = useState({ x: 0.5, y: 0.5 });
-  const [gesture, setGesture] = useState(null);
+  const [drumGrid,  setDrumGrid]  = useState(DEFAULT_GRID);
+  const [synthGrid, setSynthGrid] = useState(DEFAULT_SYNTH_GRID);
+  const [mode,      setMode]      = useState("drums"); // "drums" | "synth"
+  const [cursor,    setCursor]    = useState({ x: 0.5, y: 0.5 });
+  const [gesture,   setGesture]   = useState(null);
 
   const gridRef        = useRef(null);
   const containerRef   = useRef(null);
-  const cursorRef      = useRef({ x: 0.5, y: 0.5 });  // always-fresh cursor for gesture handler
-  const lastGestureRef = useRef(0);                     // timestamp of last fired gesture
+  const cursorRef      = useRef({ x: 0.5, y: 0.5 });
+  const lastGestureRef = useRef(0);
 
-  const { startContext, triggerRow } = useAudio();
-  const { playing, burstCounters, togglePlay } = useSequencer(grid, triggerRow);
+  const { startContext, triggerRow, triggerNote } = useAudio();
+
+  const { playing, drumBurstCounters, synthBurstCounters, togglePlay } =
+    useSequencer(drumGrid, synthGrid, triggerRow, triggerNote);
+
   const videoRef = useCamera();
+
+  // active grid and rows depending on mode
+  const activeGrid         = mode === "drums" ? drumGrid  : synthGrid;
+  const activeRows         = mode === "drums" ? ROWS      : SYNTH_NOTES;
+  const activeBurstCounters = mode === "drums" ? drumBurstCounters : synthBurstCounters;
+
+  const toggleCell = useCallback((row, step) => {
+    if (mode === "drums") {
+      setDrumGrid(prev => ({
+        ...prev,
+        [row]: prev[row].map((v, i) => (i === step ? (v ? 0 : 1) : v)),
+      }));
+    } else {
+      setSynthGrid(prev => ({
+        ...prev,
+        [row]: prev[row].map((v, i) => (i === step ? (v ? 0 : 1) : v)),
+      }));
+    }
+  }, [mode]);
 
   const handleHandResult = useCallback(({ rightFingertip, gesture: g }) => {
     if (rightFingertip) {
@@ -41,46 +64,43 @@ export default function HandSyncSequencer() {
     }
     setGesture(g);
 
-    // --- thumbs up: place/remove note at cursor position ---
     if (g === "peace") {
       const now = Date.now();
       if (now - lastGestureRef.current < GESTURE_COOLDOWN_MS) return;
       lastGestureRef.current = now;
 
       const { x, y } = cursorRef.current;
+      const rows      = mode === "drums" ? ROWS : SYNTH_NOTES;
+      const step      = Math.floor(x * STEPS);
+      const rowIdx    = Math.floor(y * rows.length);
 
-      // map 0-1 cursor fractions to grid row + step
-      const step = Math.floor(x * STEPS);
-      const rowIdx = Math.floor(y * ROWS.length);
+      if (step < 0 || step >= STEPS || rowIdx < 0 || rowIdx >= rows.length) return;
 
-      // clamp to valid range
-      if (step < 0 || step >= STEPS || rowIdx < 0 || rowIdx >= ROWS.length) return;
-
-      const row = ROWS[rowIdx];
-      setGrid(prev => ({
-        ...prev,
-        [row]: prev[row].map((v, i) => (i === step ? (v ? 0 : 1) : v)),
-      }));
+      const row = rows[rowIdx];
+      if (mode === "drums") {
+        setDrumGrid(prev => ({
+          ...prev,
+          [row]: prev[row].map((v, i) => (i === step ? (v ? 0 : 1) : v)),
+        }));
+      } else {
+        setSynthGrid(prev => ({
+          ...prev,
+          [row]: prev[row].map((v, i) => (i === step ? (v ? 0 : 1) : v)),
+        }));
+      }
     }
-
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   useHandTracking(videoRef, handleHandResult);
 
-  // stop gesture → play/pause
   useEffect(() => {
     if (gesture !== "stop") return;
     Tone.start().then(() => {
       startContext().then(() => togglePlay());
     });
-  }, [gesture]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const toggleCell = useCallback((row, step) => {
-    setGrid(prev => ({
-      ...prev,
-      [row]: prev[row].map((v, i) => (i === step ? (v ? 0 : 1) : v)),
-    }));
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gesture]);
 
   const handlePlay = useCallback(async () => {
     await Tone.start();
@@ -94,43 +114,53 @@ export default function HandSyncSequencer() {
       <CameraFeed ref={videoRef} />
 
       <div style={{
-        position: "absolute",
-        inset: 0,
+        position: "absolute", inset: 0,
         background: "rgba(0,0,0,0.35)",
         pointerEvents: "none",
       }} />
 
       <ThreeCanvas
-        grid={grid}
-        burstCounters={burstCounters}
+        grid={activeGrid}
+        rows={activeRows}
+        burstCounters={activeBurstCounters}
         containerRef={containerRef}
         gridRef={gridRef}
       />
 
-      <Grid grid={grid} gridRef={gridRef} onToggle={toggleCell} />
+      <Grid
+        grid={activeGrid}
+        rows={activeRows}
+        gridRef={gridRef}
+        onToggle={toggleCell}
+      />
 
       <PlayBar playing={playing} />
       <Cursor x={cursor.x} y={cursor.y} />
 
+      {/* mode toggle */}
+      <button
+        className="mode-btn"
+        onClick={() => setMode(m => m === "drums" ? "synth" : "drums")}
+      >
+        {mode === "drums" ? "SYNTH" : "DRUMS"}
+      </button>
+
+      {/* play button */}
+      <button className="play-btn" onClick={handlePlay}>
+        {playing ? "■" : "▶"}
+      </button>
+
       {gesture && (
         <div style={{
-          position: "absolute",
-          bottom: 56,
-          left: "50%",
+          position: "absolute", bottom: 56, left: "50%",
           transform: "translateX(-50%)",
-          color: "cyan",
-          fontFamily: "monospace",
-          fontSize: 18,
-          pointerEvents: "none",
-          opacity: 0.85,
+          color: "rgba(255,255,255,0.6)",
+          fontFamily: "monospace", fontSize: 12,
+          pointerEvents: "none", letterSpacing: "2px",
         }}>
           {gesture}
         </div>
       )}
-
-      <button className="play-btn" onClick={handlePlay}>
-        {playing ? "■" : "▶"}
-      </button>
 
     </div>
   );

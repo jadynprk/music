@@ -1,73 +1,84 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import * as Tone from "tone";
-import { ROWS, STEPS, BPM } from "../constants";
+import { ROWS, SYNTH_NOTES, STEPS, BPM } from "../constants";
 
 Tone.getTransport().bpm.value = BPM;
 Tone.getTransport().loop      = true;
 Tone.getTransport().loopStart = 0;
-Tone.getTransport().loopEnd   = "1m"; // 1 bar = 16 sixteenth notes at 4/4
+Tone.getTransport().loopEnd   = "1m";
 
 /**
- * Manages sequencer playback using Tone.Transport for sample-accurate timing.
+ * Manages sequencer playback for both drum and synth grids.
+ * Both grids play simultaneously on the same Transport clock.
  *
- * Tone.Sequence fires every 16th note exactly on the hardware clock.
- * triggerRow is called from inside the sequence — audio fires first,
- * then React state updates for visuals, keeping them locked together.
- *
- * Returns:
- *   playing       — boolean
- *   burstCounters — Map of "rowIdx-stepIdx" → incrementing number
- *   togglePlay    — async fn — calls Tone.start() then starts Transport
+ * Props:
+ *   drumGrid   — { [rowName]: number[] }
+ *   synthGrid  — { [note]: number[] }
+ *   triggerRow — (row, time) => void
+ *   triggerNote — (note, time) => void
  */
-export function useSequencer(grid, triggerRow) {
-  const [playing,       setPlaying]       = useState(false);
-  const [burstCounters, setBurstCounters] = useState(new Map());
+export function useSequencer(drumGrid, synthGrid, triggerRow, triggerNote) {
+  const [playing,            setPlaying]            = useState(false);
+  const [drumBurstCounters,  setDrumBurstCounters]  = useState(new Map());
+  const [synthBurstCounters, setSynthBurstCounters] = useState(new Map());
 
-  const gridStateRef = useRef(grid);
+  const drumGridRef  = useRef(drumGrid);
+  const synthGridRef = useRef(synthGrid);
   const sequenceRef  = useRef(null);
   const stepRef      = useRef(0);
 
-  // keep grid ref fresh so Tone callback always reads latest notes
-  useEffect(() => {
-    gridStateRef.current = grid;
-  }, [grid]);
+  useEffect(() => { drumGridRef.current  = drumGrid;  }, [drumGrid]);
+  useEffect(() => { synthGridRef.current = synthGrid; }, [synthGrid]);
 
-  // build the Tone.Sequence once on mount
   useEffect(() => {
-    Tone.getTransport().bpm.value = BPM;
-
     const steps = Array.from({ length: STEPS }, (_, i) => i);
 
     const sequence = new Tone.Sequence(
       (time, step) => {
         stepRef.current = step;
-        const currentGrid = gridStateRef.current;
-        const hitting     = [];
+        const dGrid = drumGridRef.current;
+        const sGrid = synthGridRef.current;
 
+        const drumHits  = [];
+        const synthHits = [];
+
+        // fire drums
         ROWS.forEach((row, r) => {
-          if (currentGrid[row][step]) {
-            // trigger audio at exact Tone time — sample-accurate
+          if (dGrid[row]?.[step]) {
             triggerRow(row, time);
-            hitting.push(`${r}-${step}`);
+            drumHits.push(`${r}-${step}`);
           }
         });
 
-        // schedule visual updates to fire as close to the audio as possible
-        // Tone.Draw syncs callbacks to the next animation frame after `time`
+        // fire synth notes
+        SYNTH_NOTES.forEach((note, n) => {
+          if (sGrid[note]?.[step]) {
+            triggerNote(note, time);
+            synthHits.push(`${n}-${step}`);
+          }
+        });
+
         Tone.getDraw().schedule(() => {
-          if (hitting.length) {
-            setBurstCounters(prev => {
+          if (drumHits.length) {
+            setDrumBurstCounters(prev => {
               const next = new Map(prev);
-              hitting.forEach(k => next.set(k, (next.get(k) ?? 0) + 1));
+              drumHits.forEach(k => next.set(k, (next.get(k) ?? 0) + 1));
+              return next;
+            });
+          }
+          if (synthHits.length) {
+            setSynthBurstCounters(prev => {
+              const next = new Map(prev);
+              synthHits.forEach(k => next.set(k, (next.get(k) ?? 0) + 1));
               return next;
             });
           }
         }, time);
       },
       steps,
-      "16n" // one step = one 16th note
+      "16n"
     );
- 
+
     sequenceRef.current = sequence;
 
     return () => {
@@ -81,8 +92,8 @@ export function useSequencer(grid, triggerRow) {
     await Tone.start();
 
     if (Tone.getTransport().state === "started") {
-      sequenceRef.current?.stop(Math.max(0, Tone.now()));  // clamp to 0
       Tone.getTransport().stop();
+      sequenceRef.current?.stop(0);
       stepRef.current = 0;
       setPlaying(false);
     } else {
@@ -92,5 +103,5 @@ export function useSequencer(grid, triggerRow) {
     }
   }, []);
 
-  return { playing, burstCounters, togglePlay };
+  return { playing, drumBurstCounters, synthBurstCounters, togglePlay };
 }

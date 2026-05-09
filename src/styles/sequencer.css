@@ -60,12 +60,10 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 10px;
+  width: 1px;
   background: rgba(255, 255, 255, 0.7);
   pointer-events: none;
-  /*box-shadow: 0 0 6px rgba(255, 255, 255, 0.3);*/
-  box-shadow: 0 0 8px 2px rgba(255, 255, 255, 0.4),
-              0 0 20px 4px rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.3);
 }
 
 
@@ -112,6 +110,30 @@
 }
 
 .play-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* ── mode toggle button ── */
+.mode-btn {
+  position: absolute;
+  bottom: 16px;
+  left: 60px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.7);
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  z-index: 10;
+}
+
+.mode-btn:hover {
   background: rgba(255, 255, 255, 0.15);
   border-color: rgba(255, 255, 255, 0.4);
 }

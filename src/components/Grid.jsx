@@ -1,45 +1,45 @@
 import { useCallback } from "react";
-import { ROWS, STEPS } from "../constants";
+import { STEPS } from "../constants";
 
 /**
  * Props:
- *   grid       — { [rowName]: number[] }
- *   playhead   — current step index or null
- *   gridRef    — ref attached to the grid div
- *   onToggle   — (rowName, stepIndex) => void
- *
- * Note: cube rendering is handled by ThreeCanvas — this component
- * only provides invisible click targets and floating row labels.
+ *   grid     — { [rowName]: number[] }
+ *   rows     — string[] — row names (ROWS for drums, SYNTH_NOTES for synth)
+ *   gridRef  — ref attached to the grid div
+ *   onToggle — (rowName, stepIndex) => void
  */
-export default function Grid({ grid, gridRef, onToggle }) {
+export default function Grid({ grid, rows, gridRef, onToggle }) {
   const handleClick = useCallback((row, step) => {
     onToggle(row, step);
   }, [onToggle]);
 
   return (
-    <div ref={gridRef} className="grid">
-      {ROWS.map((row, r) => (
+    <div
+      ref={gridRef}
+      className="grid"
+      style={{ gridTemplateRows: `repeat(${rows.length}, 1fr)` }}
+    >
+      {rows.map((row, r) => (
         <>
-          {/* floating row label — absolutely positioned */}
           <div
             key={`lbl-${row}`}
             className="row-label"
             style={{
-              position: "absolute",
-              top:    `${(r / ROWS.length) * 100}%`,
-              height: `${(1 / ROWS.length) * 100}%`,
+              position:      "absolute",
+              top:           `${(r / rows.length) * 100}%`,
+              height:        `${(1 / rows.length) * 100}%`,
               left: 0, right: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              display:       "flex",
+              alignItems:    "center",
+              justifyContent:"center",
               pointerEvents: "none",
-              zIndex: 2,
+              zIndex:        2,
+              fontSize:      rows.length > 4 ? 9 : 11,
             }}
           >
             {row}
           </div>
 
-          {/* invisible click cells */}
           {Array.from({ length: STEPS }, (_, s) => (
             <div
               key={`${row}-${s}`}
