@@ -1,5 +1,6 @@
 {
   "name": "music-cv",
+  "homepage": "https://jadynprk.github.io/music",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
