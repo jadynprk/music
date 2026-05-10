@@ -60,12 +60,10 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 10px;
+  width: 1px;
   background: rgba(255, 255, 255, 0.7);
   pointer-events: none;
-  /*box-shadow: 0 0 6px rgba(255, 255, 255, 0.3);*/
-  box-shadow: 0 0 8px 2px rgba(255, 255, 255, 0.4),
-              0 0 20px 4px rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.3);
 }
 
 

@@ -118,60 +118,40 @@ export default function ThreeCanvas({ grid, rows, burstCounters, containerRef, g
           const progress = bf > 0 ? Math.sin((1 - bf / BURST_FRAMES) * Math.PI) : 0;
           if (bf > 0) burstRef.current[key] = bf - 1;
 
-          // depth: constant at rest, grows during burst
-          const depth = Math.min(w, h) * 0.18;
-          const lift  = progress * depth * 3.5;
-          const d     = depth + lift;
+          // burst: scale up slightly from center
+          const scale  = 1 + progress * 0.12;
+          const cx     = x + w / 2;
+          const cy     = y + h / 2;
+          const pw     = w * scale;
+          const ph     = h * scale;
+          const px     = cx - pw / 2;
+          const py     = cy - ph / 2;
 
-          // isometric offset — goes up-left
-          const ox = -d * 0.55;
-          const oy = -d * 0.45;
+          // subtle depth offset only during burst
+          const ox = -progress * w * 0.08;
+          const oy = -progress * h * 0.08;
 
-          // back face
+          // back face (only visible during burst)
+          if (progress > 0.05) {
+            ctx.beginPath();
+            ctx.rect(px + ox, py + oy, pw, ph);
+            ctx.fillStyle   = "rgba(255,255,255,0.02)";
+            ctx.strokeStyle = `rgba(255,255,255,${progress * 0.25})`;
+            ctx.lineWidth   = 0.8;
+            ctx.fill();
+            ctx.stroke();
+          }
+
+          // front face — always drawn at exact cell position at rest
           ctx.beginPath();
-          ctx.rect(x + ox, y + oy, w, h);
-          ctx.fillStyle   = "rgba(255,255,255,0.03)";
-          ctx.strokeStyle = `rgba(255,255,255,${0.10 + progress * 0.18})`;
-          ctx.lineWidth   = 0.6;
-          ctx.fill();
-          ctx.stroke();
-
-          // top connecting face
-          ctx.beginPath();
-          ctx.moveTo(x,        y);
-          ctx.lineTo(x + ox,   y + oy);
-          ctx.lineTo(x + ox + w, y + oy);
-          ctx.lineTo(x + w,    y);
-          ctx.closePath();
-          ctx.fillStyle   = `rgba(255,255,255,${0.05 + progress * 0.07})`;
-          ctx.strokeStyle = `rgba(255,255,255,${0.12 + progress * 0.20})`;
-          ctx.lineWidth   = 0.6;
-          ctx.fill();
-          ctx.stroke();
-
-          // left connecting face
-          ctx.beginPath();
-          ctx.moveTo(x,      y);
-          ctx.lineTo(x + ox, y + oy);
-          ctx.lineTo(x + ox, y + oy + h);
-          ctx.lineTo(x,      y + h);
-          ctx.closePath();
-          ctx.fillStyle   = `rgba(255,255,255,${0.04 + progress * 0.05})`;
-          ctx.strokeStyle = `rgba(255,255,255,${0.12 + progress * 0.20})`;
-          ctx.lineWidth   = 0.6;
-          ctx.fill();
-          ctx.stroke();
-
-          // front face — always at exact cell position, no offset
-          ctx.beginPath();
-          ctx.rect(x, y, w, h);
+          ctx.rect(px, py, pw, ph);
           ctx.fillStyle   = `rgba(255,255,255,${0.07 + progress * 0.18})`;
           ctx.strokeStyle = `rgba(255,255,255,${0.28 + progress * 0.45})`;
           ctx.lineWidth   = 0.8 + progress * 0.6;
           ctx.fill();
           ctx.stroke();
 
-          // dot — stays centered on front face, never moves
+          // dot — centered, doesn't scale with burst
           const dotR = Math.min(w, h) * 0.22;
           ctx.beginPath();
           ctx.arc(x + w / 2, y + h / 2, dotR, 0, Math.PI * 2);
